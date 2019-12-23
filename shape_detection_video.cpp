@@ -10,14 +10,18 @@ Mat image; Mat imageS; Mat result; Mat canny_output; Mat imgHSV; Mat imgThreshol
 Mat drawing = Mat::zeros( canny_output.size(), CV_8UC3 );
 
 int thresh = 100;
+
 int max_thresh = 255;
 int min_area = 600;
 int roi_y = 0;
+int min_x = 9999;
 RNG rng(12345);
+int largest_area=0;
+int largest_contour_index=0;
 
 int count_red = 0;
 
-string window_name = "Shape Detection";
+const char* window_name = "Shape Detection";
 
 void contour_callback (int, void*);
 
@@ -41,16 +45,16 @@ int main (int argc, char** argv){
     int iHighV = 255;
 
     //Create trackbars in "Control" window
-    namedWindow("Control", CV_WINDOW_AUTOSIZE);
-    cvCreateTrackbar("LowH", "Control", &iLowH, 179); //Hue (0 - 179)
-    cvCreateTrackbar("HighH", "Control", &iHighH, 179);
+    namedWindow(window_name, CV_WINDOW_AUTOSIZE);
+    cvCreateTrackbar("LowH", window_name, &iLowH, 255); //Hue (0 - 179)
+    cvCreateTrackbar("HighH", window_name, &iHighH, 255);
 
 
-    cvCreateTrackbar("LowS", "Control", &iLowS, 255); //Saturation (0 - 255)
-    cvCreateTrackbar("HighS", "Control", &iHighS, 255);
+    cvCreateTrackbar("LowS", window_name, &iLowS, 255); //Saturation (0 - 255)
+    cvCreateTrackbar("HighS", window_name, &iHighS, 255);
 
-    cvCreateTrackbar("LowV", "Control", &iLowV, 255); //Value (0 - 255)
-    cvCreateTrackbar("HighV", "Control", &iHighV, 255);
+    cvCreateTrackbar("LowV", window_name, &iLowV, 255); //Value (0 - 255)
+    cvCreateTrackbar("HighV", window_name, &iHighV, 255);
 
     while(1){
 
@@ -83,28 +87,32 @@ int main (int argc, char** argv){
         Canny(imgThresholded, canny_output, thresh, thresh*2, 3);
         findContours( canny_output, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
 
-        for (int i=0; i < contours.size();i++ ){
-            Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
-            drawContours( drawing, contours, i, color, 2, 8, hierarchy, 0, Point() );
+        Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
 
+        for (int i=0; i < contours.size();i++ ){
+            
+            
              //Find approx of the polyshape
             vector<Point> approx;
             vector<Point> cnt = contours.at(i);
             double area = contourArea(cnt);
             approxPolyDP(cnt, approx, 5, true);
-  
-            //Find Center of Contour
+
+            if(area>largest_area){
+                largest_area=area;
+                largest_contour_index=i;                //Store the index of largest contour
+            }
+            
+            //Find X and Y Center of Contour
             Moments m = moments(approx,true);
             Point p(m.m10/m.m00, m.m01/m.m00);
             int x = p.x;
             int y = p.y;
 
-            int min_x = 9999;
-
             //Make a region of interest 
             //if (area > min_area && y > roi_y){}
-      
-                //Count circle
+            if (x > min_x && y > roi_y){
+                //Search Shape
                 if(3 <= approx.size() <= 6){
                     count_red += 1;
                     cout << "Detected" << endl;
@@ -117,9 +125,10 @@ int main (int argc, char** argv){
                 else{
                     cout << "Not Detected" << endl;
                 } 
-            //cout << approx.size() << endl;
+            }         
    
-        }   
+        } 
+        drawContours( image, contours, largest_contour_index, color, 2, 8, hierarchy, 0, Point() );
         imshow (window_name, imgThresholded);
         imshow ("Original",image);
         // Press  ESC on keyboard to exit
